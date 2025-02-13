@@ -3,12 +3,10 @@ from discord.ext import commands
 import os
 import asyncio
 import yt_dlp
-from dotenv import load_dotenv
 import urllib.parse, urllib.request, re
 
-# تحميل الرمز من ملف .env
-load_dotenv()
-TOKEN = os.getenv('discord_token')
+# الحصول على التوكن من المتغير البيئي
+TOKEN = os.getenv('DISCORD_TOKEN')  # استخدم اسم المتغير البيئي "DISCORD_TOKEN"
 
 # إعداد النوايا (Intents)
 intents = discord.Intents.default()
@@ -32,13 +30,11 @@ yt_dl_options = {
     "no_warnings": True  # إخفاء التحذيرات
 }
 ytdl = yt_dlp.YoutubeDL(yt_dl_options)
-
 ffmpeg_options = {
     'before_options':
     '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
     'options': '-vn'
 }
-
 
 # حدث بدء التشغيل
 @client.event
@@ -48,7 +44,6 @@ async def on_ready():
     await client.change_presence(activity=discord.Activity(
         type=discord.ActivityType.listening, name="REF"))
 
-
 # تشغيل الأغنية التالية
 async def play_next(ctx):
     if ctx.guild.id in queues and queues[ctx.guild.id]:
@@ -56,7 +51,6 @@ async def play_next(ctx):
         await play(ctx, link=link)
     else:
         await ctx.send("The queue is empty!")
-
 
 # دالة تشغيل الأغنية
 @client.command(name="p")
@@ -67,7 +61,6 @@ async def play(ctx, *, link):
             await ctx.send(
                 "You need to be in a voice channel to use this command!")
             return
-
         # الانضمام إلى القناة الصوتية
         if ctx.guild.id not in voice_clients:
             voice_client = await ctx.author.voice.channel.connect()
@@ -75,7 +68,6 @@ async def play(ctx, *, link):
             await ctx.send(f"Joined {ctx.author.voice.channel.name}!")
         else:
             voice_client = voice_clients[ctx.guild.id]
-
         # البحث عن الفيديو إذا لم يكن الرابط مباشرًا
         if youtube_base_url not in link:
             query_string = urllib.parse.urlencode({'search_query': link})
@@ -84,30 +76,25 @@ async def play(ctx, *, link):
             search_results = re.findall(r'/watch\?v=(.{11})',
                                         content.read().decode())
             link = youtube_watch_url + search_results[0]
-
         # تنزيل المعلومات الخاصة بالفيديو
         loop = asyncio.get_event_loop()
         data = await loop.run_in_executor(
             None, lambda: ytdl.extract_info(link, download=False))
         song = data['url']
         print(f"Playing audio from: {song}")
-
         # التحقق من أن الرابط صالح
         if not song:
             await ctx.send("Could not retrieve the audio stream.")
             return
-
         # تشغيل الصوت باستخدام البث المباشر
         player = discord.FFmpegOpusAudio(song, **ffmpeg_options)
         voice_client.play(player,
                           after=lambda e: asyncio.run_coroutine_threadsafe(
                               play_next(ctx), client.loop))
-
         await ctx.send(f"Now playing: {data['title']}")
     except Exception as e:
         print(f"Error: {e}")
         await ctx.send("An error occurred while trying to play the song.")
-
 
 # أوامر إضافية (مثل pause, resume, stop, queue)
 @client.command(name="pause")
@@ -117,14 +104,12 @@ async def pause(ctx):
     except Exception as e:
         print(e)
 
-
 @client.command(name="resume")
 async def resume(ctx):
     try:
         voice_clients[ctx.guild.id].resume()
     except Exception as e:
         print(e)
-
 
 @client.command(name="s")
 async def stop(ctx):
@@ -135,14 +120,12 @@ async def stop(ctx):
     except Exception as e:
         print(e)
 
-
 @client.command(name="queue")
 async def queue(ctx, *, url):
     if ctx.guild.id not in queues:
         queues[ctx.guild.id] = []
     queues[ctx.guild.id].append(url)
     await ctx.send("Added to queue!")
-
 
 # تشغيل البوت
 client.run(TOKEN)
